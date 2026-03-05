@@ -459,3 +459,83 @@ export async function ensureDataDir(dataDir: string): Promise<string> {
   await secureFs.mkdir(dataDir, { recursive: true });
   return dataDir;
 }
+
+// ============================================================================
+// Automation Paths
+// ============================================================================
+
+/**
+ * Get the global automations directory path
+ *
+ * Stores user-scoped automation definitions as JSON files.
+ *
+ * @param dataDir - Absolute path to global data directory
+ * @returns Absolute path to {dataDir}/automations
+ */
+export function getGlobalAutomationsDir(dataDir: string): string {
+  return path.join(dataDir, 'automations');
+}
+
+/**
+ * Get the project automations directory path
+ *
+ * Stores project-scoped automation definitions as JSON files.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/automations
+ */
+export function getProjectAutomationsDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'automations');
+}
+
+/**
+ * Ensure the global automations directory exists
+ *
+ * @param dataDir - Absolute path to global data directory
+ * @returns Promise resolving to the created global automations directory
+ */
+export async function ensureGlobalAutomationsDir(dataDir: string): Promise<string> {
+  await ensureDataDir(dataDir);
+  const dir = getGlobalAutomationsDir(dataDir);
+  await secureFs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Ensure the project automations directory exists
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Promise resolving to the created project automations directory
+ */
+export async function ensureProjectAutomationsDir(projectPath: string): Promise<string> {
+  await ensureAutomakerDir(projectPath);
+  const dir = getProjectAutomationsDir(projectPath);
+  await secureFs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Get the automation scheduler state file path
+ *
+ * Stores persisted scheduler state for surviving server restarts.
+ * Includes scheduled runs, webhook secrets, and timing info.
+ *
+ * @param dataDir - Absolute path to global data directory
+ * @returns Absolute path to {dataDir}/automation-scheduler-state.json
+ */
+export function getAutomationSchedulerStatePath(dataDir: string): string {
+  return path.join(dataDir, 'automation-scheduler-state.json');
+}
+
+/**
+ * Get the project automation variables file path
+ *
+ * Stores project-level variables for automation workflows.
+ * Variables can be referenced using {{project.variableName}} syntax.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/automation-variables.json
+ */
+export function getProjectAutomationVariablesPath(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'automation-variables.json');
+}

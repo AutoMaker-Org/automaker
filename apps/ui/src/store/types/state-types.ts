@@ -281,6 +281,10 @@ export interface AppState {
 
   // Feature Templates
   featureTemplates: FeatureTemplate[]; // Feature templates for quick task creation
+  templateFeatureAutoStart: boolean; // Whether template features auto-start or just add to backlog
+
+  // Automation Settings
+  automationSettings: { allowDangerousScriptCommands: boolean }; // Automation security settings
 
   // Claude-Compatible Providers (new system)
   claudeCompatibleProviders: ClaudeCompatibleProvider[]; // Providers that expose models to dropdowns
@@ -688,6 +692,10 @@ export interface AppActions {
   updateFeatureTemplate: (id: string, updates: Partial<FeatureTemplate>) => Promise<void>;
   deleteFeatureTemplate: (id: string) => Promise<void>;
   reorderFeatureTemplates: (templateIds: string[]) => Promise<void>;
+  setTemplateFeatureAutoStart: (enabled: boolean) => Promise<void>;
+
+  // Automation Settings actions
+  setAutomationSettings: (settings: { allowDangerousScriptCommands: boolean }) => Promise<void>;
 
   // Claude-Compatible Provider actions (new system)
   addClaudeCompatibleProvider: (provider: ClaudeCompatibleProvider) => Promise<void>;

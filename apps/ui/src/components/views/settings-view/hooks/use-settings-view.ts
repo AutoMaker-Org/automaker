@@ -24,6 +24,7 @@ export type SettingsViewId =
   | 'worktrees'
   | 'account'
   | 'security'
+  | 'automations'
   | 'developer'
   | 'danger';
 

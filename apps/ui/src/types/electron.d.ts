@@ -1212,6 +1212,8 @@ export interface WorktreeAPI {
       hasAnyRemotes: boolean;
       /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
       trackingRemote?: string;
+      /** List of remote names that have a branch matching the current branch name */
+      remotesWithBranch?: string[];
     };
     error?: string;
     code?: 'NOT_GIT_REPO' | 'NO_COMMITS'; // Error codes for git status issues

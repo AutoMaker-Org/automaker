@@ -14,25 +14,22 @@
 import type { Request, Response } from 'express';
 import { createLogger } from '@automaker/utils';
 import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
+import { getErrorMessage, logError } from '../common.js';
 
 const logger = createLogger('ReconcileFeatures');
 
-interface ReconcileRequest {
-  projectPath: string;
-}
-
 export function createReconcileHandler(autoModeService: AutoModeServiceCompat) {
   return async (req: Request, res: Response): Promise<void> => {
-    const { projectPath } = req.body as ReconcileRequest;
-
-    if (!projectPath) {
-      res.status(400).json({ error: 'Project path is required' });
-      return;
-    }
-
-    logger.info(`Reconciling feature states for ${projectPath}`);
-
     try {
+      const { projectPath } = req.body as { projectPath: string };
+
+      if (!projectPath) {
+        res.status(400).json({ success: false, error: 'projectPath is required' });
+        return;
+      }
+
+      logger.info(`Reconciling feature states for ${projectPath}`);
+
       const reconciledCount = await autoModeService.reconcileFeatureStates(projectPath);
 
       res.json({
@@ -44,10 +41,8 @@ export function createReconcileHandler(autoModeService: AutoModeServiceCompat) {
             : 'No features needed reconciliation',
       });
     } catch (error) {
-      logger.error('Error reconciling feature states:', error);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+      logError(error, 'Reconcile feature states failed');
+      res.status(500).json({ success: false, error: getErrorMessage(error) });
     }
   };
 }

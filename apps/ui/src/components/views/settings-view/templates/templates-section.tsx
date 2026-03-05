@@ -48,6 +48,8 @@ interface TemplatesSectionProps {
   onUpdateTemplate: (id: string, updates: Partial<FeatureTemplate>) => Promise<void>;
   onDeleteTemplate: (id: string) => Promise<void>;
   onReorderTemplates: (templateIds: string[]) => Promise<void>;
+  templateFeatureAutoStart: boolean;
+  onUpdateAutoStart: (enabled: boolean) => Promise<void>;
 }
 
 interface TemplateFormData {
@@ -165,6 +167,8 @@ export function TemplatesSection({
   onUpdateTemplate,
   onDeleteTemplate,
   onReorderTemplates,
+  templateFeatureAutoStart,
+  onUpdateAutoStart,
 }: TemplatesSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FeatureTemplate | null>(null);
@@ -305,9 +309,25 @@ export function TemplatesSection({
             Add Template
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground/80 ml-12">
+        <p className="text-sm text-muted-foreground/80 ml-12 mb-6">
           Create reusable task templates for quick feature creation from the Add Feature dropdown.
         </p>
+
+        {/* Template Auto-start Setting */}
+        <div className="ml-12 p-4 rounded-xl border border-border/50 bg-accent/5 flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <Label className="text-sm font-medium">Auto-start template features</Label>
+            <p className="text-xs text-muted-foreground">
+              When enabled, features created from templates will start immediately. If disabled,
+              they will be added to the backlog for manual starting.
+            </p>
+          </div>
+          <Checkbox
+            checked={templateFeatureAutoStart}
+            onCheckedChange={(checked) => onUpdateAutoStart(!!checked)}
+            data-testid="template-autostart-toggle"
+          />
+        </div>
       </div>
 
       <div className="p-6">

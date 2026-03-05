@@ -109,6 +109,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'eventHooks',
   'ntfyEndpoints',
   'featureTemplates',
+  'templateFeatureAutoStart',
+  'automationSettings', // Automation security and behavior settings
   'claudeCompatibleProviders', // Claude-compatible provider configs - must persist to server
   'claudeApiProfiles',
   'activeClaudeApiProfileId',
@@ -879,6 +881,11 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       ntfyEndpoints: serverSettings.ntfyEndpoints ?? [],
       // Feature templates
       featureTemplates: serverSettings.featureTemplates ?? [],
+      templateFeatureAutoStart: serverSettings.templateFeatureAutoStart ?? true,
+      // Automation settings
+      automationSettings: serverSettings.automationSettings ?? {
+        allowDangerousScriptCommands: false,
+      },
       // Codex CLI Settings
       codexAutoLoadAgents: serverSettings.codexAutoLoadAgents ?? false,
       codexSandboxMode: serverSettings.codexSandboxMode ?? 'workspace-write',

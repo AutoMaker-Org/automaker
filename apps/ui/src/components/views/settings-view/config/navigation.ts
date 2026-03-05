@@ -18,6 +18,7 @@ import {
   Webhook,
   FileCode2,
   FileText,
+  Zap,
 } from 'lucide-react';
 import {
   AnthropicIcon,
@@ -77,6 +78,7 @@ export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
       { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
       { id: 'audio', label: 'Audio', icon: Volume2 },
       { id: 'event-hooks', label: 'Event Hooks', icon: Webhook },
+      { id: 'automations', label: 'Automations', icon: Zap },
     ],
   },
   {

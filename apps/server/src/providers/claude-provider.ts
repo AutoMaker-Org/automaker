@@ -217,6 +217,12 @@ export class ClaudeProvider extends BaseProvider {
     const maxThinkingTokens =
       thinkingLevel === 'adaptive' ? undefined : getThinkingTokenBudget(thinkingLevel);
 
+    // Capture stderr output from the Claude Code subprocess for diagnostics.
+    // When the process exits with a non-zero code, stderr typically contains
+    // the actual error (auth failure, invalid model, etc.) that we need to
+    // surface to the user instead of the generic "process exited with code N".
+    const stderrChunks: string[] = [];
+
     // Build Claude SDK options
     const sdkOptions: Options = {
       model,
@@ -249,6 +255,11 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.agents && { agents: options.agents }),
       // Pass through outputFormat for structured JSON outputs
       ...(options.outputFormat && { outputFormat: options.outputFormat }),
+      // Capture stderr for diagnostic information on process failures
+      stderr: (chunk: string) => {
+        stderrChunks.push(chunk);
+        logger.debug('[ClaudeProvider] stderr:', chunk.trimEnd());
+      },
     };
 
     // Build prompt payload
@@ -297,27 +308,48 @@ export class ClaudeProvider extends BaseProvider {
       // Enhance error with user-friendly message and classification
       const errorInfo = classifyError(error);
       const userMessage = getUserFriendlyErrorMessage(error);
+      const stderrOutput = stderrChunks.join('').trim();
 
       logger.error('executeQuery() error during execution:', {
         type: errorInfo.type,
         message: errorInfo.message,
         isRateLimit: errorInfo.isRateLimit,
         retryAfter: errorInfo.retryAfter,
+        stderr: stderrOutput || '(no stderr captured)',
         stack: (error as Error).stack,
       });
 
-      // Build enhanced error message with additional guidance for rate limits
-      const message = errorInfo.isRateLimit
-        ? `${userMessage}\n\nTip: If you're running multiple features in auto-mode, consider reducing concurrency (maxConcurrency setting) to avoid hitting rate limits.`
-        : userMessage;
+      // When the process exits with a non-zero code and stderr has useful info,
+      // include it in the error message so upstream callers (e.g., automation
+      // engine) can surface the real cause to the user.
+      let message: string;
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      const isProcessExit =
+        rawMessage.includes('Claude Code process exited') ||
+        rawMessage.includes('Claude Code process terminated');
+
+      if (isProcessExit && stderrOutput) {
+        // Extract the most useful part of stderr (last meaningful lines)
+        const stderrLines = stderrOutput.split('\n').filter(Boolean);
+        const relevantStderr = stderrLines.slice(-5).join('; ');
+        message = `${userMessage} (stderr: ${relevantStderr})`;
+      } else if (errorInfo.isRateLimit) {
+        message = `${userMessage}\n\nTip: If you're running multiple features in auto-mode, consider reducing concurrency (maxConcurrency setting) to avoid hitting rate limits.`;
+      } else {
+        message = userMessage;
+      }
 
       const enhancedError = new Error(message) as Error & {
         originalError: unknown;
         type: string;
         retryAfter?: number;
+        stderr?: string;
       };
       enhancedError.originalError = error;
       enhancedError.type = errorInfo.type;
+      if (stderrOutput) {
+        enhancedError.stderr = stderrOutput;
+      }
 
       if (errorInfo.isRateLimit) {
         enhancedError.retryAfter = errorInfo.retryAfter;

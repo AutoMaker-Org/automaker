@@ -19,6 +19,8 @@ import type { PromptCustomization } from './prompts.js';
 import type { CodexSandboxMode, CodexApprovalPolicy } from './codex.js';
 import type { ReasoningEffort } from './provider.js';
 
+import type { AutomationVariableValue, ProjectVariable } from './automation.js';
+
 // Re-export ModelAlias for convenience
 export type { ModelAlias };
 
@@ -1282,6 +1284,9 @@ export interface GlobalSettings {
   /** Default model and thinking level for new feature cards */
   defaultFeatureModel: PhaseModelEntry;
 
+  /** Whether to auto-start features created from templates (true) or just add to backlog (false) */
+  templateFeatureAutoStart: boolean;
+
   // Audio Preferences
   /** Mute completion notification sound */
   muteDoneSound: boolean;
@@ -1525,6 +1530,16 @@ export interface GlobalSettings {
    * Each PhaseModelEntry can specify a providerId for provider-specific models.
    */
   activeClaudeApiProfileId?: string | null;
+
+  // Automation Settings
+  /**
+   * Global automation configuration settings.
+   * Controls security and behavior for automation workflows.
+   */
+  automationSettings?: {
+    /** When true, skip dangerous command pattern checks in run-script-exec steps (default: false) */
+    allowDangerousScriptCommands: boolean;
+  };
 
   /**
    * Per-worktree auto mode settings
@@ -1781,6 +1796,14 @@ export interface ProjectSettings {
    * Each PhaseModelEntry can specify a providerId for provider-specific models.
    */
   activeClaudeApiProfileId?: string | null;
+
+  // Automation Variables
+  /**
+   * Project-level variables for automation workflows.
+   * These variables can be referenced in automation steps using {{project.variableName}} syntax.
+   * Variables are stored as key-value pairs with optional metadata.
+   */
+  automationVariables?: ProjectVariable[];
 }
 
 /**
@@ -1869,6 +1892,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
   defaultFeatureModel: { model: 'claude-opus', thinkingLevel: 'adaptive' }, // Use canonical ID with adaptive thinking
+  templateFeatureAutoStart: true,
   muteDoneSound: false,
   disableSplashScreen: false,
   defaultSortNewestCardOnTop: false,
@@ -1932,6 +1956,9 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   // Deprecated - kept for migration
   claudeApiProfiles: [],
   activeClaudeApiProfileId: null,
+  automationSettings: {
+    allowDangerousScriptCommands: false,
+  },
   autoModeByWorktree: {},
 };
 

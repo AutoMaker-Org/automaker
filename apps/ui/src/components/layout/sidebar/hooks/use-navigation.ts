@@ -15,11 +15,39 @@ import {
   Bell,
   Settings,
   Home,
+  BotMessageSquare,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
 import type { Project } from '@/lib/electron';
 import { getElectronAPI } from '@/lib/electron';
+
+// Section labels for consistency
+const SECTION_LABELS = {
+  DASHBOARD: '',
+  PROJECT: 'Project',
+  TOOLS: 'Tools',
+  GITHUB: 'GitHub',
+} as const;
+
+// Navigation item IDs
+const NAV_ITEM_IDS = {
+  OVERVIEW: 'overview',
+  BOARD: 'board',
+  GRAPH: 'graph',
+  FILE_EDITOR: 'file-editor',
+  AGENT: 'agent',
+  TERMINAL: 'terminal',
+  IDEATION: 'ideation',
+  SPEC: 'spec',
+  CONTEXT: 'context',
+  MEMORY: 'memory',
+  AUTOMATIONS: 'automations',
+  GITHUB_ISSUES: 'github-issues',
+  GITHUB_PRS: 'github-prs',
+  NOTIFICATIONS: 'notifications',
+  PROJECT_SETTINGS: 'project-settings',
+} as const;
 
 interface UseNavigationProps {
   shortcuts: {
@@ -104,76 +132,86 @@ export function useNavigation({
 
   // Build navigation sections
   const navSections: NavSection[] = useMemo(() => {
+    // Define all Tools section items with their properties
+    // Note: Automations is intentionally the last item in the Tools section
     const allToolsItems: NavItem[] = [
       {
-        id: 'ideation',
+        id: NAV_ITEM_IDS.IDEATION,
         label: 'Ideation',
         icon: Lightbulb,
         shortcut: shortcuts.ideation,
       },
       {
-        id: 'spec',
+        id: NAV_ITEM_IDS.SPEC,
         label: 'Spec Editor',
         icon: FileText,
         shortcut: shortcuts.spec,
         isLoading: isSpecGenerating,
       },
       {
-        id: 'context',
+        id: NAV_ITEM_IDS.CONTEXT,
         label: 'Context',
         icon: BookOpen,
         shortcut: shortcuts.context,
       },
       {
-        id: 'memory',
+        id: NAV_ITEM_IDS.MEMORY,
         label: 'Memory',
         icon: Brain,
         shortcut: shortcuts.memory,
       },
+      {
+        id: NAV_ITEM_IDS.AUTOMATIONS,
+        label: 'Automations',
+        icon: BotMessageSquare,
+        // Note: No keyboard shortcut for Automations - can be added in the future
+      },
     ];
 
-    // Filter out hidden items
+    // Filter out hidden items based on user settings
+    // Terminal is not in Tools items, so we don't check hideTerminal here
     const visibleToolsItems = allToolsItems.filter((item) => {
-      if (item.id === 'spec' && hideSpecEditor) {
+      if (item.id === NAV_ITEM_IDS.SPEC && hideSpecEditor) {
         return false;
       }
-      if (item.id === 'context' && hideContext) {
+      if (item.id === NAV_ITEM_IDS.CONTEXT && hideContext) {
         return false;
       }
       return true;
     });
 
-    // Build project items - Terminal and File Editor are conditionally included
+    // Build project items - includes main project navigation items
+    // Terminal and File Editor are conditionally included based on settings
     const projectItems: NavItem[] = [
       {
-        id: 'board',
+        id: NAV_ITEM_IDS.BOARD,
         label: 'Kanban Board',
         icon: LayoutGrid,
         shortcut: shortcuts.board,
       },
       {
-        id: 'graph',
+        id: NAV_ITEM_IDS.GRAPH,
         label: 'Graph View',
         icon: Network,
         shortcut: shortcuts.graph,
       },
       {
-        id: 'file-editor',
+        id: NAV_ITEM_IDS.FILE_EDITOR,
         label: 'File Editor',
         icon: Folder,
       },
       {
-        id: 'agent',
+        id: NAV_ITEM_IDS.AGENT,
         label: 'Agent Runner',
         icon: Bot,
         shortcut: shortcuts.agent,
       },
     ];
 
-    // Add Terminal to Project section if not hidden
+    // Conditionally add Terminal to Project section if not hidden
     if (!hideTerminal) {
       projectItems.push({
-        id: 'terminal',
+        id: NAV_ITEM_IDS.TERMINAL,
         label: 'Terminal',
         icon: Terminal,
         shortcut: shortcuts.terminal,
@@ -183,10 +221,10 @@ export function useNavigation({
     const sections: NavSection[] = [
       // Dashboard - standalone at top (links to projects overview)
       {
-        label: '',
+        label: SECTION_LABELS.DASHBOARD,
         items: [
           {
-            id: 'overview',
+            id: NAV_ITEM_IDS.OVERVIEW,
             label: 'Dashboard',
             icon: Home,
           },
@@ -194,14 +232,14 @@ export function useNavigation({
       },
       // Project section - expanded by default
       {
-        label: 'Project',
+        label: SECTION_LABELS.PROJECT,
         items: projectItems,
         collapsible: true,
         defaultCollapsed: false,
       },
-      // Tools section - collapsed by default
+      // Tools section - collapsed by default, contains Automations as last item
       {
-        label: 'Tools',
+        label: SECTION_LABELS.TOOLS,
         items: visibleToolsItems,
         collapsible: true,
         defaultCollapsed: true,
@@ -211,17 +249,17 @@ export function useNavigation({
     // Add GitHub section if project has a GitHub remote
     if (hasGitHubRemote) {
       sections.push({
-        label: 'GitHub',
+        label: SECTION_LABELS.GITHUB,
         items: [
           {
-            id: 'github-issues',
+            id: NAV_ITEM_IDS.GITHUB_ISSUES,
             label: 'Issues',
             icon: CircleDot,
             shortcut: shortcuts.githubIssues,
             count: unviewedValidationsCount,
           },
           {
-            id: 'github-prs',
+            id: NAV_ITEM_IDS.GITHUB_PRS,
             label: 'Pull Requests',
             icon: GitPullRequest,
             shortcut: shortcuts.githubPrs,
@@ -234,17 +272,17 @@ export function useNavigation({
 
     // Add Notifications and Project Settings as a standalone section (no label for visual separation)
     sections.push({
-      label: '',
+      label: SECTION_LABELS.DASHBOARD,
       items: [
         {
-          id: 'notifications',
+          id: NAV_ITEM_IDS.NOTIFICATIONS,
           label: 'Notifications',
           icon: Bell,
           shortcut: shortcuts.notifications,
           count: unreadNotificationsCount,
         },
         {
-          id: 'project-settings',
+          id: NAV_ITEM_IDS.PROJECT_SETTINGS,
           label: 'Project Settings',
           icon: Settings,
           shortcut: shortcuts.projectSettings,

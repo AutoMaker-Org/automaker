@@ -66,6 +66,18 @@ export class ConcurrencyManager {
   }
 
   /**
+   * Get the current (primary) branch name for a project.
+   * Exposes the injected branch resolver for use by other services
+   * (e.g., AutoLoopCoordinator) that need primary branch resolution.
+   *
+   * @param projectPath - The project path
+   * @returns The primary branch name (e.g., 'main', 'master')
+   */
+  async getCurrentBranchForProject(projectPath: string): Promise<string | null> {
+    return this.getCurrentBranch(projectPath);
+  }
+
+  /**
    * Acquire a slot in the runningFeatures map for a feature.
    * Implements reference counting via leaseCount to support nested calls
    * (e.g., resumeFeature -> executeFeature).

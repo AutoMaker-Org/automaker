@@ -26,6 +26,19 @@ export function createStartHandler(autoModeService: AutoModeServiceCompat) {
         return;
       }
 
+      if (
+        maxConcurrency !== undefined &&
+        (typeof maxConcurrency !== 'number' ||
+          maxConcurrency < 1 ||
+          !Number.isFinite(maxConcurrency))
+      ) {
+        res.status(400).json({
+          success: false,
+          error: 'maxConcurrency must be a positive integer',
+        });
+        return;
+      }
+
       // Normalize branchName: undefined becomes null
       const normalizedBranchName = branchName ?? null;
       const worktreeDesc = normalizedBranchName

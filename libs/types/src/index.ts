@@ -365,6 +365,61 @@ export type {
 } from './event-history.js';
 export { EVENT_HISTORY_VERSION, DEFAULT_EVENT_HISTORY_INDEX } from './event-history.js';
 
+// Automation runtime types
+export type {
+  AutomationScope,
+  AutomationTriggerType,
+  AutomationTrigger,
+  AutomationTriggerConfig,
+  AutomationScheduleTrigger,
+  AutomationEventTrigger,
+  AutomationWebhookTrigger,
+  AutomationDateTrigger,
+  AutomationManualTrigger,
+  AutomationVariablePrimitive,
+  AutomationVariableValue,
+  BuiltInAutomationStepType,
+  AutomationStepEditorComponentKey,
+  AutomationStepConfigFieldType,
+  AutomationStepConfigFieldSchema,
+  AutomationStepConfigSchema,
+  AutomationStepTypeDescriptor,
+  AutomationStep,
+  AutomationDefinition,
+  AutomationRunStatus,
+  AutomationStepRunStatus,
+  AutomationRunError,
+  AutomationStepRun,
+  AutomationRun,
+  ExecuteAutomationOptions,
+  AutomationStepExecutionContext,
+  AutomationStepExecutor,
+  // Scheduler state types
+  ScheduledRunStatus,
+  ScheduledRun,
+  AutomationSchedulerState,
+  AutomationSchedulerEvent,
+  TriggerAutomationOptions,
+  SchedulerOperationResult,
+  WebhookTriggerPayload,
+  // Variable system types
+  VariableScope,
+  VariableDescriptor,
+  SystemVariableProvider,
+  SystemVariableDefinition,
+  ProjectVariable,
+  WorkflowVariableDefinition,
+  StepOutputReference,
+  VariableContext,
+  VariableBrowserGroup,
+  ListVariablesOptions,
+  ListVariablesResult,
+  SetProjectVariableRequest,
+  DeleteProjectVariableRequest,
+  AutoModeOperations,
+} from './automation.js';
+export { AUTOMATION_BUILTIN_STEP_TYPES } from './automation-builtins.js';
+
 // Worktree and PR types
 export type {
   PRState,

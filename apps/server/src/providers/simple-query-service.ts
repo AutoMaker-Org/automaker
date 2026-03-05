@@ -175,6 +175,14 @@ export async function simpleQuery(options: SimpleQueryOptions): Promise<SimpleQu
         break;
       } else if (msg.subtype === 'error_max_structured_output_retries') {
         throw new Error('Could not produce valid structured output after retries');
+      } else if (msg.subtype === 'error_during_execution') {
+        // SDK encountered an error during execution (API error, auth failure, etc.)
+        // The errors array contains the actual error messages from the CLI
+        const errors = (msg as unknown as Record<string, unknown>).errors as string[] | undefined;
+        const errorDetail = errors?.length ? errors.join('; ') : 'Unknown execution error';
+        throw new Error(`AI execution error: ${errorDetail}`);
+      } else if (msg.subtype === 'error_max_budget_usd') {
+        throw new Error('AI query exceeded the maximum budget limit');
       }
     }
   }
@@ -265,6 +273,13 @@ export async function streamingQuery(options: StreamingQueryOptions): Promise<Si
         break;
       } else if (msg.subtype === 'error_max_structured_output_retries') {
         throw new Error('Could not produce valid structured output after retries');
+      } else if (msg.subtype === 'error_during_execution') {
+        // SDK encountered an error during execution (API error, auth failure, etc.)
+        const errors = (msg as unknown as Record<string, unknown>).errors as string[] | undefined;
+        const errorDetail = errors?.length ? errors.join('; ') : 'Unknown execution error';
+        throw new Error(`AI execution error: ${errorDetail}`);
+      } else if (msg.subtype === 'error_max_budget_usd') {
+        throw new Error('AI query exceeded the maximum budget limit');
       }
     }
   }

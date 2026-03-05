@@ -30,6 +30,12 @@ export {
   getCredentialsPath,
   getProjectSettingsPath,
   ensureDataDir,
+  getGlobalAutomationsDir,
+  getProjectAutomationsDir,
+  ensureGlobalAutomationsDir,
+  ensureProjectAutomationsDir,
+  getAutomationSchedulerStatePath,
+  getProjectAutomationVariablesPath,
   // Ideation paths
   getIdeationDir,
   getIdeasDir,

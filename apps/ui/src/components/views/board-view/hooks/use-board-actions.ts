@@ -150,7 +150,7 @@ export function useBoardActions({
       thinkingLevel: ThinkingLevel;
       reasoningEffort?: ReasoningEffort;
       providerId?: string;
-      branchName: string;
+      branchName?: string;
       priority: number;
       planningMode: PlanningMode;
       requirePlanApproval: boolean;

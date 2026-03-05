@@ -29,6 +29,7 @@ export * from './views/agent';
 export * from './views/settings';
 export * from './views/setup';
 export * from './views/profiles';
+export * from './views/automation';
 
 // Component utilities
 export * from './components/dialogs';

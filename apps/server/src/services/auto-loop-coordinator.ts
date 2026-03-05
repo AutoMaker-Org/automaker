@@ -483,14 +483,22 @@ export class AutoLoopCoordinator {
 
   /**
    * Check if a feature belongs to the current worktree based on branch name.
-   * For main worktree (branchName === null or 'main'): includes features with no branchName or branchName === 'main'.
-   * For feature worktrees (branchName !== null and !== 'main'): only includes features with matching branchName.
+   * For main worktree (branchName === null): includes features with no branchName
+   * or branchName matching the primary branch (e.g., 'main', 'master').
+   * For feature worktrees (branchName !== null): only includes features with matching branchName.
+   *
+   * @param primaryBranch - The resolved primary branch name (e.g., 'main', 'master')
+   *                        obtained from the worktree resolver. Required for correct
+   *                        matching when branchName is null.
    */
-  private featureBelongsToWorktree(feature: Feature, branchName: string | null): boolean {
-    const isMainWorktree = branchName === null || branchName === 'main';
-    if (isMainWorktree) {
-      // Main worktree: include features with no branchName or branchName === 'main'
-      return !feature.branchName || feature.branchName === 'main';
+  private featureBelongsToWorktree(
+    feature: Feature,
+    branchName: string | null,
+    primaryBranch: string | null
+  ): boolean {
+    if (branchName === null) {
+      // Main worktree: include features with no branchName or matching the primary branch
+      return !feature.branchName || (primaryBranch != null && feature.branchName === primaryBranch);
     } else {
       // Feature worktree: only include exact branch match
       return feature.branchName === branchName;
@@ -512,8 +520,21 @@ export class AutoLoopCoordinator {
 
     try {
       const allFeatures = await this.loadAllFeaturesFn(projectPath);
+      // Resolve primary branch for correct matching when branchName is null.
+      // Uses the concurrencyManager's branch resolver since the coordinator
+      // doesn't have direct access to worktreeResolver.
+      let primaryBranch: string | null = null;
+      if (branchName === null) {
+        try {
+          primaryBranch = await this.concurrencyManager.getCurrentBranchForProject(projectPath);
+        } catch {
+          // Fall back to 'main' if resolution fails
+          primaryBranch = 'main';
+        }
+      }
       return allFeatures.some(
-        (f) => f.status === 'in_progress' && this.featureBelongsToWorktree(f, branchName)
+        (f) =>
+          f.status === 'in_progress' && this.featureBelongsToWorktree(f, branchName, primaryBranch)
       );
     } catch (error) {
       const errorInfo = classifyError(error);

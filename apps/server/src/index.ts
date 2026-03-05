@@ -88,6 +88,13 @@ import { createEventHistoryRoutes } from './routes/event-history/index.js';
 import { getEventHistoryService } from './services/event-history-service.js';
 import { getTestRunnerService } from './services/test-runner-service.js';
 import { createProjectsRoutes } from './routes/projects/index.js';
+import { createAutomationRoutes } from './routes/automation/index.js';
+import {
+  initializeAutomationSchedulerService,
+  shutdownAutomationSchedulerService,
+} from './services/automation-scheduler-service.js';
+import { AutomationRuntimeEngine } from './services/automation-runtime-engine.js';
+import { getAutomationVariableService } from './services/automation-variable-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -370,6 +377,13 @@ testRunnerService.setEventEmitter(events);
 // Initialize Event Hook Service for custom event triggers (with history storage)
 eventHookService.initialize(events, settingsService, eventHistoryService, featureLoader);
 
+// Initialize Automation Runtime Engine and Scheduler Service
+// Pass settingsService so AI prompt steps can access credentials for Claude API authentication
+const automationRuntimeEngine = AutomationRuntimeEngine.create(DATA_DIR, settingsService);
+let automationSchedulerService: Awaited<
+  ReturnType<typeof initializeAutomationSchedulerService>
+> | null = null;
+
 // Initialize services
 (async () => {
   // Migrate settings from legacy Electron userData location if needed
@@ -461,6 +475,68 @@ eventHookService.initialize(events, settingsService, eventHistoryService, featur
   void codexModelCacheService.getModels().catch((err) => {
     logger.error('Failed to bootstrap Codex model cache:', err);
   });
+
+  // Initialize Automation Scheduler Service
+  try {
+    automationSchedulerService = await initializeAutomationSchedulerService(
+      DATA_DIR,
+      events,
+      automationRuntimeEngine
+    );
+
+    // Set up auto mode operations for automation steps
+    automationSchedulerService.setAutoModeOperations({
+      start: async (projectPath, branchName, maxConcurrency) => {
+        const resolvedMaxConcurrency = await autoModeService.startAutoLoopForProject(
+          projectPath,
+          branchName ?? null,
+          maxConcurrency
+        );
+        return {
+          success: true,
+          maxConcurrency: resolvedMaxConcurrency,
+          message: `Auto mode started with max ${resolvedMaxConcurrency} concurrent features`,
+        };
+      },
+      stop: async (projectPath, branchName) => {
+        const runningCount = await autoModeService.stopAutoLoopForProject(
+          projectPath,
+          branchName ?? null
+        );
+        return {
+          success: true,
+          runningFeaturesCount: runningCount,
+          message: 'Auto mode stopped',
+        };
+      },
+      getStatus: async (projectPath, branchName) => {
+        const status = await autoModeService.getStatusForProject(projectPath, branchName ?? null);
+        return {
+          isRunning: status.runningCount > 0,
+          isAutoLoopRunning: status.isAutoLoopRunning,
+          runningFeatures: status.runningFeatures,
+          runningCount: status.runningCount,
+          maxConcurrency: status.maxConcurrency,
+        };
+      },
+      setConcurrency: async (projectPath, maxConcurrency, branchName) => {
+        // Start/restart auto mode with new concurrency
+        const resolvedMaxConcurrency = await autoModeService.startAutoLoopForProject(
+          projectPath,
+          branchName ?? null,
+          maxConcurrency
+        );
+        return {
+          success: true,
+          maxConcurrency: resolvedMaxConcurrency,
+        };
+      },
+    });
+
+    logger.info('Automation scheduler service initialized');
+  } catch (err) {
+    logger.error('Failed to initialize automation scheduler service:', err);
+  }
 })();
 
 // Run stale validation cleanup every hour to prevent memory leaks from crashed validations
@@ -520,6 +596,26 @@ app.use('/api/event-history', createEventHistoryRoutes(eventHistoryService, sett
 app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)
+);
+
+// Automation routes (with null check for scheduler service)
+app.use(
+  '/api/automation',
+  (req, res, next) => {
+    if (!automationSchedulerService) {
+      res.status(503).json({ success: false, error: 'Automation scheduler not initialized' });
+      return;
+    }
+    next();
+  },
+  (req, res, next) => {
+    const variableService = getAutomationVariableService();
+    createAutomationRoutes(automationSchedulerService!, automationRuntimeEngine, variableService)(
+      req,
+      res,
+      next
+    );
+  }
 );
 
 // Create HTTP server
@@ -840,6 +936,7 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
 // Start server with error handling for port conflicts
 const startServer = (port: number, host: string) => {
   server.listen(port, host, () => {
+    logger.info('Gemini test - Hello World');
     const terminalStatus = isTerminalEnabled()
       ? isTerminalPasswordRequired()
         ? 'enabled (password protected)'
@@ -961,6 +1058,9 @@ const gracefulShutdown = async (signal: string) => {
   // This ensures they can be resumed when the server restarts
   // Note: markAllRunningFeaturesInterrupted handles errors internally and never rejects
   await autoModeService.markAllRunningFeaturesInterrupted(`${signal} signal received`);
+
+  // Shutdown automation scheduler service
+  await shutdownAutomationSchedulerService();
 
   terminalService.cleanup();
   server.close(() => {

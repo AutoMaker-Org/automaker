@@ -220,6 +220,44 @@ export class FeatureStateManager {
   }
 
   /**
+   * Update arbitrary fields on a feature (e.g., imagePaths) without changing status.
+   * Reads the feature from disk, applies the provided field overrides, and persists.
+   *
+   * @param projectPath - Path to the project
+   * @param featureId - ID of the feature to update
+   * @param fields - Partial Feature fields to merge onto the existing feature
+   */
+  async updateFeatureFields(
+    projectPath: string,
+    featureId: string,
+    fields: Partial<Feature>
+  ): Promise<void> {
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const result = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+        maxBackups: DEFAULT_BACKUP_COUNT,
+        autoRestore: true,
+      });
+      logRecoveryWarning(result, `Feature ${featureId}`, logger);
+      const feature = result.data;
+      if (!feature) {
+        logger.warn(`[updateFeatureFields] Feature ${featureId} not found`);
+        return;
+      }
+
+      Object.assign(feature, fields);
+      feature.updatedAt = new Date().toISOString();
+
+      await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+    } catch (error) {
+      logger.error(`[updateFeatureFields] Failed to update feature ${featureId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Mark a feature as interrupted due to server restart or other interruption.
    *
    * This is a convenience helper that updates the feature status to 'interrupted',

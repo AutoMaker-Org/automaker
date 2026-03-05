@@ -363,6 +363,10 @@ const initialState: AppState = {
   eventHooks: [],
   ntfyEndpoints: [],
   featureTemplates: DEFAULT_GLOBAL_SETTINGS.featureTemplates ?? [],
+  templateFeatureAutoStart: DEFAULT_GLOBAL_SETTINGS.templateFeatureAutoStart ?? true,
+  automationSettings: DEFAULT_GLOBAL_SETTINGS.automationSettings ?? {
+    allowDangerousScriptCommands: false,
+  },
   claudeCompatibleProviders: [],
   claudeApiProfiles: [],
   activeClaudeApiProfileId: null,
@@ -1591,6 +1595,32 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       await httpApi.settings.updateGlobal({ featureTemplates: get().featureTemplates });
     } catch (error) {
       logger.error('Failed to sync feature templates:', error);
+    }
+  },
+
+  setTemplateFeatureAutoStart: async (enabled) => {
+    set({ templateFeatureAutoStart: enabled });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ templateFeatureAutoStart: enabled });
+    } catch (error) {
+      logger.error('Failed to update template auto-start setting:', error);
+      // Revert local state on failure
+      set({ templateFeatureAutoStart: !enabled });
+      throw error;
+    }
+  },
+
+  setAutomationSettings: async (settings) => {
+    const prev = get().automationSettings;
+    set({ automationSettings: settings });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ automationSettings: settings });
+    } catch (error) {
+      logger.error('Failed to sync automationSettings:', error);
+      set({ automationSettings: prev });
+      throw error;
     }
   },
 

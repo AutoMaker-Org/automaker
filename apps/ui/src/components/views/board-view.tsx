@@ -143,6 +143,7 @@ export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewPro
     featureTemplates,
     defaultSortNewestCardOnTop,
     upsertAndSetCurrentProject,
+    templateFeatureAutoStart,
   } = useAppStore(
     useShallow((state) => ({
       currentProject: state.currentProject,
@@ -164,6 +165,7 @@ export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewPro
       featureTemplates: state.featureTemplates,
       defaultSortNewestCardOnTop: state.defaultSortNewestCardOnTop,
       upsertAndSetCurrentProject: state.upsertAndSetCurrentProject,
+      templateFeatureAutoStart: state.templateFeatureAutoStart,
     }))
   );
   // Also get keyboard shortcuts for the add feature shortcut
@@ -1315,13 +1317,22 @@ export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewPro
   // Handler for template selection - creates a feature from a template
   const handleTemplateSelect = useCallback(
     async (template: FeatureTemplate) => {
+      logger.info('Template selected:', template.name);
       const modelEntry = template.model ||
         useAppStore.getState().defaultFeatureModel || { model: 'claude-opus' };
 
-      // Start the template immediately (same behavior as clicking "Make")
-      await handleQuickAddAndStart(template.prompt, modelEntry);
+      const actionText = templateFeatureAutoStart ? 'Creating and starting' : 'Adding to backlog';
+      toast.info(`${actionText} template: ${template.name}`);
+
+      if (templateFeatureAutoStart) {
+        // Start the template immediately (same behavior as clicking "Make")
+        await handleQuickAddAndStart(template.prompt, modelEntry);
+      } else {
+        // Just add to backlog without starting
+        await handleQuickAdd(template.prompt, modelEntry);
+      }
     },
-    [handleQuickAddAndStart]
+    [handleQuickAddAndStart, handleQuickAdd, templateFeatureAutoStart]
   );
 
   // Handler for managing PR comments - opens the PR Comment Resolution dialog

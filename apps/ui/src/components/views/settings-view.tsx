@@ -30,6 +30,7 @@ import {
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
 import { EventHooksSection } from './settings-view/event-hooks';
+import { AutomationsSection } from './settings-view/automations';
 import { TemplatesSection } from './settings-view/templates/templates-section';
 import { ImportExportDialog } from './settings-view/components/import-export-dialog';
 import type { Theme } from './settings-view/shared/types';
@@ -71,6 +72,10 @@ export function SettingsView() {
     updateFeatureTemplate,
     deleteFeatureTemplate,
     reorderFeatureTemplates,
+    templateFeatureAutoStart,
+    setTemplateFeatureAutoStart,
+    automationSettings,
+    setAutomationSettings,
   } = useAppStore();
 
   // Global theme (project-specific themes are managed in Project Settings)
@@ -156,6 +161,8 @@ export function SettingsView() {
             onUpdateTemplate={updateFeatureTemplate}
             onDeleteTemplate={deleteFeatureTemplate}
             onReorderTemplates={reorderFeatureTemplates}
+            templateFeatureAutoStart={templateFeatureAutoStart}
+            onUpdateAutoStart={setTemplateFeatureAutoStart}
           />
         );
       case 'model-defaults':
@@ -181,6 +188,13 @@ export function SettingsView() {
         );
       case 'event-hooks':
         return <EventHooksSection />;
+      case 'automations':
+        return (
+          <AutomationsSection
+            automationSettings={automationSettings}
+            onAutomationSettingsChange={setAutomationSettings}
+          />
+        );
       case 'defaults':
         return (
           <FeatureDefaultsSection

@@ -23,24 +23,7 @@ import type { WorktreeResolver } from './worktree-resolver.js';
 import type { SettingsService } from './settings-service.js';
 import { pipelineService } from './pipeline-service.js';
 
-// Re-export callback types from execution-types.ts for backward compatibility
-export type {
-  RunAgentFn,
-  ExecutePipelineFn,
-  UpdateFeatureStatusFn,
-  LoadFeatureFn,
-  GetPlanningPromptPrefixFn,
-  SaveFeatureSummaryFn,
-  RecordLearningsFn,
-  ContextExistsFn,
-  ResumeFeatureFn,
-  TrackFailureFn,
-  SignalPauseFn,
-  RecordSuccessFn,
-  SaveExecutionStateFn,
-  LoadContextFilesFn,
-} from './execution-types.js';
-
+// Import and re-export callback types from execution-types.ts for backward compatibility
 import type {
   RunAgentFn,
   ExecutePipelineFn,
@@ -57,6 +40,22 @@ import type {
   SaveExecutionStateFn,
   LoadContextFilesFn,
 } from './execution-types.js';
+export type {
+  RunAgentFn,
+  ExecutePipelineFn,
+  UpdateFeatureStatusFn,
+  LoadFeatureFn,
+  GetPlanningPromptPrefixFn,
+  SaveFeatureSummaryFn,
+  RecordLearningsFn,
+  ContextExistsFn,
+  ResumeFeatureFn,
+  TrackFailureFn,
+  SignalPauseFn,
+  RecordSuccessFn,
+  SaveExecutionStateFn,
+  LoadContextFilesFn,
+};
 
 const logger = createLogger('ExecutionService');
 
@@ -417,6 +416,9 @@ Please continue from where you left off and complete all remaining tasks. Use th
       const sortedSteps = [...(pipelineConfig?.steps || [])]
         .sort((a, b) => a.order - b.order)
         .filter((step) => !excludedStepIds.has(step.id));
+      // Track loaded feature to avoid redundant file reads
+      let completedFeature: Feature | null = null;
+
       if (sortedSteps.length > 0) {
         await this.executePipelineFn({
           projectPath,
@@ -434,8 +436,8 @@ Please continue from where you left off and complete all remaining tasks. Use th
         });
         pipelineCompleted = true;
         // Check if pipeline set a terminal status (e.g., merge_conflict) — don't overwrite it
-        const refreshed = await this.loadFeatureFn(projectPath, featureId);
-        if (refreshed?.status === 'merge_conflict') {
+        completedFeature = await this.loadFeatureFn(projectPath, featureId);
+        if (completedFeature?.status === 'merge_conflict') {
           return;
         }
       }
@@ -475,15 +477,41 @@ Please continue from where you left off and complete all remaining tasks. Use th
         finalStatus = 'verified';
       }
 
-      await this.updateFeatureStatusFn(projectPath, featureId, finalStatus);
-      this.recordSuccessFn();
-
-      // Check final task completion state for accurate reporting
-      const completedFeature = await this.loadFeatureFn(projectPath, featureId);
+      // Load feature if not already loaded by pipeline check above
+      if (!completedFeature) {
+        completedFeature = await this.loadFeatureFn(projectPath, featureId);
+      }
       const totalTasks = completedFeature?.planSpec?.tasks?.length ?? 0;
       const completedTasks =
         completedFeature?.planSpec?.tasks?.filter((t) => t.status === 'completed').length ?? 0;
       const hasIncompleteTasks = totalTasks > 0 && completedTasks < totalTasks;
+
+      // Emit completion event BEFORE status change so hooks (e.g., notifications, webhooks)
+      // fire when the task transitions to waiting_approval, matching user expectation of
+      // "completion" timing. The status update then persists and emits feature_status_changed.
+      const elapsedSeconds = Math.round((Date.now() - tempRunningFeature.startTime) / 1000);
+      let completionMessage = `Feature completed in ${elapsedSeconds}s`;
+      if (finalStatus === 'verified') completionMessage += ' - auto-verified';
+      if (hasIncompleteTasks)
+        completionMessage += ` (${completedTasks}/${totalTasks} tasks completed)`;
+
+      if (isAutoMode) {
+        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          featureName: feature.title,
+          branchName: feature.branchName ?? null,
+          executionMode: 'auto',
+          passes: true,
+          message: completionMessage,
+          projectPath,
+          model: tempRunningFeature.model,
+          provider: tempRunningFeature.provider,
+        });
+      }
+
+      // Now update the status - this emits feature_status_changed after persistence
+      await this.updateFeatureStatusFn(projectPath, featureId, finalStatus);
+      this.recordSuccessFn();
 
       try {
         // Only save summary if feature doesn't already have one (e.g., accumulated from pipeline steps)
@@ -505,26 +533,6 @@ Please continue from where you left off and complete all remaining tasks. Use th
         await this.recordLearningsFn(projectPath, feature, agentOutput);
       } catch {
         /* learnings recording failed */
-      }
-
-      const elapsedSeconds = Math.round((Date.now() - tempRunningFeature.startTime) / 1000);
-      let completionMessage = `Feature completed in ${elapsedSeconds}s`;
-      if (finalStatus === 'verified') completionMessage += ' - auto-verified';
-      if (hasIncompleteTasks)
-        completionMessage += ` (${completedTasks}/${totalTasks} tasks completed)`;
-
-      if (isAutoMode) {
-        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-          featureId,
-          featureName: feature.title,
-          branchName: feature.branchName ?? null,
-          executionMode: 'auto',
-          passes: true,
-          message: completionMessage,
-          projectPath,
-          model: tempRunningFeature.model,
-          provider: tempRunningFeature.provider,
-        });
       }
     } catch (error) {
       const errorInfo = classifyError(error);

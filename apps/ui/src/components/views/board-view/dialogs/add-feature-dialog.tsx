@@ -174,7 +174,7 @@ export function AddFeatureDialog({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
-  const [images, setImages] = useState<FeatureImage[]>([]);
+  const [images, _setImages] = useState<FeatureImage[]>([]);
   const [imagePaths, setImagePaths] = useState<DescriptionImagePath[]>([]);
   const [textFilePaths, setTextFilePaths] = useState<DescriptionTextFilePath[]>([]);
   const [skipTests, setSkipTests] = useState(false);
@@ -386,41 +386,11 @@ export function AddFeatureDialog({
     };
   };
 
-  const resetForm = () => {
-    setTitle('');
-    setCategory('');
-    setDescription('');
-    setImages([]);
-    setImagePaths([]);
-    setTextFilePaths([]);
-    setSkipTests(defaultSkipTests);
-    // When a non-main worktree is selected, use its branch name for custom mode
-    setBranchName(selectedNonMainWorktreeBranch || '');
-    setPriority(2);
-    // Apply defaultThinkingLevel to the model entry (same logic as dialog open)
-    const resetModelId =
-      typeof effectiveDefaultFeatureModel.model === 'string'
-        ? effectiveDefaultFeatureModel.model
-        : '';
-    const resetAvailableLevels = getThinkingLevelsForModel(resetModelId);
-    const resetThinkingLevel = resetAvailableLevels.includes(defaultThinkingLevel)
-      ? defaultThinkingLevel
-      : resetAvailableLevels[0];
-    setModelEntry({
-      ...effectiveDefaultFeatureModel,
-      thinkingLevel: resetThinkingLevel,
-    });
-    setWorkMode(
-      getDefaultWorkMode(useWorktrees, selectedNonMainWorktreeBranch, forceCurrentBranchMode)
-    );
-    setPlanningMode(defaultPlanningMode);
-    setRequirePlanApproval(defaultRequirePlanApproval);
-    setPreviewMap(new Map());
-    setDescriptionError(false);
-    setDescriptionHistory([]);
-    setParentDependencies([]);
-    setChildDependencies([]);
-    setExcludedPipelineSteps([]);
+  // Close the dialog without resetting form fields.
+  // Form fields are properly reset when the dialog reopens via the useEffect
+  // that handles dialog initialization (the effect that syncs defaults on open).
+  // This prevents visual flash where the model resets to default before closing.
+  const closeDialog = () => {
     onOpenChange(false);
   };
 
@@ -429,7 +399,7 @@ export function AddFeatureDialog({
     const featureData = buildFeatureData();
     if (!featureData) return;
     actionFn(featureData);
-    resetForm();
+    closeDialog();
   };
 
   const handleAdd = () => handleAction(onAdd);

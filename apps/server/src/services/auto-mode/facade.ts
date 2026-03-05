@@ -739,18 +739,17 @@ export class AutoModeServiceFacade {
         .replace(/\{\{previousContext\}\}/g, previousContext)
         .replace(/\{\{followUpInstructions\}\}/g, prompt);
 
-      // Store image paths on the feature so executeFeature can pick them up
+      // Store image paths on the feature so executeFeature can pick them up.
+      // We must persist this to disk since executeFeature re-loads the feature
+      // from the filesystem — in-memory modifications would be lost.
       if (imagePaths && imagePaths.length > 0) {
-        feature.imagePaths = imagePaths.map((p) => ({
-          path: p,
-          filename: p.split('/').pop() || p,
-          mimeType: 'image/*',
-        }));
-        await this.featureStateManager.updateFeatureStatus(
-          this.projectPath,
-          featureId,
-          feature.status || 'in_progress'
-        );
+        await this.featureStateManager.updateFeatureFields(this.projectPath, featureId, {
+          imagePaths: imagePaths.map((p) => ({
+            path: p,
+            filename: p.split('/').pop() || p,
+            mimeType: 'image/*',
+          })),
+        });
       }
 
       // Delegate to executeFeature with the built continuation prompt
@@ -810,7 +809,11 @@ export class AutoModeServiceFacade {
 
     for (const check of verificationChecks) {
       try {
-        const { stdout, stderr } = await execAsync(check.cmd, { cwd: workDir, timeout: 120000 });
+        const { stdout, stderr } = await execAsync(check.cmd, {
+          cwd: workDir,
+          timeout: 120000,
+          maxBuffer: 10 * 1024 * 1024, // 10MB to handle large test outputs
+        });
         results.push({ check: check.name, passed: true, output: stdout || stderr });
       } catch (error) {
         allPassed = false;
@@ -845,6 +848,9 @@ export class AutoModeServiceFacade {
   async commitFeature(featureId: string, providedWorktreePath?: string): Promise<string | null> {
     let workDir = this.projectPath;
 
+    // Load feature once and reuse for both worktree resolution and commit message
+    const feature = await this.featureStateManager.loadFeature(this.projectPath, featureId);
+
     if (providedWorktreePath) {
       try {
         await secureFs.access(providedWorktreePath);
@@ -854,7 +860,6 @@ export class AutoModeServiceFacade {
       }
     } else {
       // Use worktreeResolver instead of manual .worktrees lookup
-      const feature = await this.featureStateManager.loadFeature(this.projectPath, featureId);
       const branchName = feature?.branchName;
       if (branchName) {
         const resolved = await this.worktreeResolver.findWorktreeForBranch(
@@ -873,9 +878,10 @@ export class AutoModeServiceFacade {
         return null;
       }
 
-      const feature = await this.featureStateManager.loadFeature(this.projectPath, featureId);
       const title =
-        feature?.description?.split('\n')[0]?.substring(0, 60) || `Feature ${featureId}`;
+        feature?.title ||
+        feature?.description?.split('\n')[0]?.substring(0, 60) ||
+        `Feature ${featureId}`;
       const commitMessage = `feat: ${title}\n\nImplemented by Automaker auto-mode`;
 
       await execGitCommand(['add', '-A'], workDir);

@@ -66,11 +66,15 @@
     ]
   },
   "dependencies": {
+    "archiver": "^7.0.1",
+    "chokidar": "^5.0.0",
     "cross-spawn": "7.0.6",
     "rehype-sanitize": "6.0.0",
     "tree-kill": "1.2.2"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/chokidar": "^2.1.7",
     "husky": "9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "3.7.4",
