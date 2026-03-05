@@ -557,8 +557,12 @@ Please continue from where you left off and complete all remaining tasks. Use th
         try {
           const currentFeature = await this.loadFeatureFn(projectPath, featureId);
           currentStatus = currentFeature?.status;
-        } catch {
-          // If loading fails, proceed with the status update anyway
+        } catch (loadErr) {
+          // If loading fails, log it and proceed with the status update anyway
+          logger.warn(
+            `[executeFeature] Failed to reload feature ${featureId} for status check:`,
+            loadErr
+          );
         }
         if (currentStatus !== 'merge_conflict') {
           await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
