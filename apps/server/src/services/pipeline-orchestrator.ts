@@ -451,7 +451,11 @@ export class PipelineOrchestrator {
           );
         }
         logger.error(`Pipeline resume failed for ${featureId}:`, error);
-        await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
+        // Don't overwrite terminal states like 'merge_conflict' that were set during pipeline execution
+        const currentFeature = await this.featureStateManager.loadFeature(projectPath, featureId);
+        if (currentFeature?.status !== 'merge_conflict') {
+          await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
+        }
         this.eventBus.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature.title,

@@ -552,7 +552,11 @@ Please continue from where you left off and complete all remaining tasks. Use th
               `Setting status to waiting_approval instead of backlog to preserve pipeline work.`
           );
         }
-        await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
+        // Don't overwrite terminal states like 'merge_conflict' that were set during pipeline execution
+        const currentFeature = await this.loadFeatureFn(projectPath, featureId);
+        if (currentFeature?.status !== 'merge_conflict') {
+          await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
+        }
         this.eventBus.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature?.title,
