@@ -80,9 +80,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && GH_VERSION="2.63.2" \
     && ARCH=$(uname -m) \
     && case "$ARCH" in \
-        x86_64) GH_ARCH="amd64" ;; \
-        aarch64|arm64) GH_ARCH="arm64" ;; \
-        *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    x86_64) GH_ARCH="amd64" ;; \
+    aarch64|arm64) GH_ARCH="arm64" ;; \
+    *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac \
     && curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o gh.tar.gz \
     && tar -xzf gh.tar.gz \
@@ -167,7 +167,9 @@ RUN git config --system --add safe.directory '*' && \
     git config --system credential.helper '!gh auth git-credential'
 
 # Copy entrypoint script for fixing permissions on mounted volumes
+# Strip CRLF if present (Windows checkout) so Linux can execute it
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Note: We stay as root here so entrypoint can fix permissions

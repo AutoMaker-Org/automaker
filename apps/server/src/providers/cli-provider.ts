@@ -606,7 +606,7 @@ export abstract class CliProvider extends BaseProvider {
     if (typeof options.prompt === 'string') {
       return {
         ...options,
-        prompt: `${systemText}\n\n---\n\n${options.prompt}`,
+        prompt: `${systemText}\n\n=== IMPLEMENTATION TASK ===\n\n${options.prompt}`,
         systemPrompt: undefined,
       };
     }

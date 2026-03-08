@@ -54,12 +54,17 @@ if [ ! -d "/home/automaker/.npm" ]; then
 fi
 chown -R automaker:automaker /home/automaker/.npm
 
+# Ensure cursor-agent can create/use its config directory (~/.config/cursor)
+# cursor-agent requires this directory for auth and cache; fails with EACCES if missing
+CURSOR_CONFIG_DIR="/home/automaker/.config/cursor"
+mkdir -p "$CURSOR_CONFIG_DIR"
+chown -R automaker:automaker /home/automaker/.config
+chmod -R 700 /home/automaker/.config
+
 # If CURSOR_AUTH_TOKEN is set, write it to the cursor auth file
 # On Linux, cursor-agent uses ~/.config/cursor/auth.json for file-based credential storage
 # The env var CURSOR_AUTH_TOKEN is also checked directly by cursor-agent
 if [ -n "$CURSOR_AUTH_TOKEN" ]; then
-    CURSOR_CONFIG_DIR="/home/automaker/.config/cursor"
-    mkdir -p "$CURSOR_CONFIG_DIR"
     # Write auth.json with the access token
     cat > "$CURSOR_CONFIG_DIR/auth.json" << EOF
 {
