@@ -2,7 +2,7 @@
  * Version utility - Reads version from package.json
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { createLogger } from '@automaker/utils';
@@ -24,7 +24,20 @@ export function getVersion(): string {
   }
 
   try {
-    const packageJsonPath = join(__dirname, '..', '..', 'package.json');
+    const candidatePaths = [
+      // Development via tsx: src/lib -> project root
+      join(__dirname, '..', '..', 'package.json'),
+      // Packaged/build output: lib -> server bundle root
+      join(__dirname, '..', 'package.json'),
+    ];
+
+    const packageJsonPath = candidatePaths.find((candidate) => existsSync(candidate));
+    if (!packageJsonPath) {
+      throw new Error(
+        `package.json not found in any expected location: ${candidatePaths.join(', ')}`
+      );
+    }
+
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     const version = packageJson.version || '0.0.0';
     cachedVersion = version;

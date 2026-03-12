@@ -28,32 +28,45 @@ const serverLogger = createLogger('Server');
 export async function startServer(): Promise<void> {
   const isDev = !app.isPackaged;
 
-  // Find Node.js executable (handles desktop launcher scenarios)
-  const nodeResult = findNodeExecutable({
-    skipSearch: isDev,
-    logger: (msg: string) => logger.info(msg),
-  });
-  const command = nodeResult.nodePath;
-
-  // Validate that the found Node executable actually exists
-  // systemPathExists is used because node-finder returns system paths
-  if (command !== 'node') {
-    let exists: boolean;
-    try {
-      exists = systemPathExists(command);
-    } catch (error) {
-      const originalError = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to verify Node.js executable at: ${command} (source: ${nodeResult.source}). Reason: ${originalError}`
-      );
-    }
-    if (!exists) {
-      throw new Error(`Node.js executable not found at: ${command} (source: ${nodeResult.source})`);
-    }
-  }
-
+  let command: string;
+  let commandSource: string;
   let args: string[];
   let serverPath: string;
+
+  if (isDev) {
+    // In development, run the TypeScript server via the user's Node.js.
+    const nodeResult = findNodeExecutable({
+      skipSearch: true,
+      logger: (msg: string) => logger.info(msg),
+    });
+    command = nodeResult.nodePath;
+    commandSource = nodeResult.source;
+
+    // Validate that the found Node executable actually exists
+    // systemPathExists is used because node-finder returns system paths
+    if (command !== 'node') {
+      let exists: boolean;
+      try {
+        exists = systemPathExists(command);
+      } catch (error) {
+        const originalError = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to verify Node.js executable at: ${command} (source: ${nodeResult.source}). Reason: ${originalError}`
+        );
+      }
+      if (!exists) {
+        throw new Error(
+          `Node.js executable not found at: ${command} (source: ${nodeResult.source})`
+        );
+      }
+    }
+  } else {
+    // In packaged builds, use Electron's bundled Node runtime instead of a system Node.
+    // This makes the desktop app self-contained and avoids incompatibilities with whatever
+    // Node version the user happens to have installed globally.
+    command = process.execPath;
+    commandSource = 'electron';
+  }
 
   // __dirname is apps/ui/dist-electron (Vite bundles all into single file)
   if (isDev) {
@@ -133,6 +146,8 @@ export async function startServer(): Promise<void> {
     PORT: state.serverPort.toString(),
     DATA_DIR: dataDir,
     NODE_PATH: serverNodeModules,
+    // Run packaged backend with Electron's embedded Node runtime.
+    ...(app.isPackaged && { ELECTRON_RUN_AS_NODE: '1' }),
     // Pass API key to server for CSRF protection
     AUTOMAKER_API_KEY: state.apiKey!,
     // Only set ALLOWED_ROOT_DIRECTORY if explicitly provided in environment
@@ -146,6 +161,7 @@ export async function startServer(): Promise<void> {
   logger.info('[DATA_DIR_SPAWN] env.DATA_DIR=', env.DATA_DIR);
 
   logger.info('Starting backend server...');
+  logger.info('Runtime command:', command, `(source: ${commandSource})`);
   logger.info('Server path:', serverPath);
   logger.info('Server root (cwd):', serverRoot);
   logger.info('NODE_PATH:', serverNodeModules);
