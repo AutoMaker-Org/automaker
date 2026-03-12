@@ -454,10 +454,11 @@ export class CursorProvider extends CliProvider {
       '--stream-partial-output' // Real-time streaming
     );
 
-    // In read-only mode, use --mode ask for Q&A style (no tools)
-    // Otherwise, add --force to allow file edits
+    // In read-only mode, use --mode ask for Q&A style (no tools).
+    // Add --trust so cursor-agent runs non-interactively without prompting (e.g., in Docker).
+    // Otherwise, add --force to allow file edits (also satisfies workspace trust).
     if (options.readOnly) {
-      cliArgs.push('--mode', 'ask');
+      cliArgs.push('--mode', 'ask', '--trust');
     } else {
       cliArgs.push('--force');
     }
