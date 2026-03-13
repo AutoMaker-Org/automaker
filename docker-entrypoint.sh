@@ -58,8 +58,8 @@ chown -R automaker:automaker /home/automaker/.npm
 # cursor-agent requires this directory for auth and cache; fails with EACCES if missing
 CURSOR_CONFIG_DIR="/home/automaker/.config/cursor"
 mkdir -p "$CURSOR_CONFIG_DIR"
-chown -R automaker:automaker /home/automaker/.config
-chmod -R 700 /home/automaker/.config
+chown -R automaker:automaker "$CURSOR_CONFIG_DIR"
+chmod -R 700 "$CURSOR_CONFIG_DIR"
 
 # If CURSOR_AUTH_TOKEN is set, write it to the cursor auth file
 # On Linux, cursor-agent uses ~/.config/cursor/auth.json for file-based credential storage
