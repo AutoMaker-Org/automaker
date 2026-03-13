@@ -542,10 +542,13 @@ export class CursorProvider extends CliProvider {
     const fullCommand = `${this.escapeForBashSingleQuoted(cliPath)} ${escapedArgs} "$(cat ${escapedPath})"`;
 
     if (this.detectedStrategy === 'npx') {
-      const allArgs = [...this.npxArgs, 'bash', '-c', fullCommand];
+      // Run full npx invocation inside bash (fixes temp-file path: npx was incorrectly
+      // passing bash -c to cursor-agent instead of running the shell)
+      const npxArgsEscaped = this.npxArgs.map((a) => this.escapeForBashSingleQuoted(a)).join(' ');
+      const fullNpxCommand = `npx ${npxArgsEscaped} ${escapedArgs} "$(cat ${escapedPath})"`;
       return {
-        command: 'npx',
-        args: allArgs,
+        command: 'bash',
+        args: ['-c', fullNpxCommand],
         cwd,
         env: filteredEnv,
         abortController: options.abortController,
