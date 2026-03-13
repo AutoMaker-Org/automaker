@@ -1120,7 +1120,7 @@ export class CursorProvider extends CliProvider {
     } finally {
       if (promptFilePath) {
         try {
-          fs.unlinkSync(promptFilePath);
+          await fs.promises.unlink(promptFilePath);
           logger.debug(`Removed temp prompt file: ${promptFilePath}`);
         } catch {
           // Ignore cleanup errors
