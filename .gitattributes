@@ -1,2 +1,2 @@
-# Ensure shell scripts use LF for Docker/Linux compatibility
-docker-entrypoint.sh text eol=lf
+# Ensure shell scripts use LF (fixes Docker entrypoint on Windows)
+*.sh text eol=lf
