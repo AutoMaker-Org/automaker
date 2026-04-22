@@ -2000,7 +2000,9 @@ export function PhaseModelSelector({
         ? 'Compute Level'
         : group.variantType === 'thinking'
           ? 'Reasoning Mode'
-          : 'Capacity Options';
+          : group.variantType === 'speed'
+            ? 'Speed'
+            : 'Capacity Options';
 
     // On mobile, render inline expansion instead of nested popover
     if (isMobile) {

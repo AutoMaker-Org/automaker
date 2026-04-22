@@ -89,14 +89,14 @@ describe('model-resolver.ts', () => {
 
     describe('Cursor models', () => {
       it('should pass through cursor-prefixed models unchanged', () => {
-        const result = resolveModelString('cursor-composer-1');
-        expect(result).toBe('cursor-composer-1');
+        const result = resolveModelString('cursor-composer-2');
+        expect(result).toBe('cursor-composer-2');
         expect(consoleSpy.log).toHaveBeenCalledWith(expect.stringContaining('Using Cursor model'));
       });
 
       it('should add cursor- prefix to bare Cursor model IDs', () => {
         const result = resolveModelString('composer-1');
-        expect(result).toBe('cursor-composer-1');
+        expect(result).toBe('cursor-composer-2');
       });
 
       it('should handle cursor-auto model', () => {

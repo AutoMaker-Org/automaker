@@ -36,6 +36,104 @@ describe('cursor-provider.ts', () => {
 
       expect(args).not.toContain('--resume');
     });
+
+    it('passes the prompt as the final positional argument', () => {
+      const provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+        cliPath?: string;
+      };
+      provider.cliPath = '/usr/local/bin/cursor-agent';
+
+      const prompt = 'Implement the feature';
+      const args = provider.buildCliArgs({
+        prompt,
+        model: 'gpt-5',
+        cwd: '/tmp/project',
+      });
+
+      expect(args[args.length - 1]).toBe(prompt);
+      expect(args).not.toContain('-');
+    });
+
+    it('joins array prompt text blocks with newlines as the final positional', () => {
+      const provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+        cliPath?: string;
+      };
+      provider.cliPath = '/usr/local/bin/cursor-agent';
+
+      const args = provider.buildCliArgs({
+        prompt: [
+          { type: 'text', text: 'First line' },
+          { type: 'text', text: 'Second line' },
+        ],
+        model: 'gpt-5',
+        cwd: '/tmp/project',
+      });
+
+      expect(args[args.length - 1]).toBe('First line\nSecond line');
+    });
+
+    it('preserves shell-like characters in the positional prompt (argv, not shell)', () => {
+      const provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+        cliPath?: string;
+      };
+      provider.cliPath = '/usr/local/bin/cursor-agent';
+
+      const prompt = 'Run `echo $HOME` and $(date)';
+      const args = provider.buildCliArgs({
+        prompt,
+        model: 'gpt-5',
+        cwd: '/tmp/project',
+      });
+
+      expect(args[args.length - 1]).toBe(prompt);
+    });
+
+    it('uses stdin placeholder as final arg on Windows when npx strategy', () => {
+      const origPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      try {
+        const provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+          cliPath?: string;
+          detectedStrategy?: string;
+        };
+        provider.cliPath = 'C:\\npx';
+        provider.detectedStrategy = 'npx';
+
+        const prompt = 'Large or special prompt';
+        const args = provider.buildCliArgs({
+          prompt,
+          model: 'gpt-5',
+          cwd: '/tmp/project',
+        });
+
+        expect(args[args.length - 1]).toBe('-');
+      } finally {
+        Object.defineProperty(process, 'platform', { value: origPlatform });
+      }
+    });
+
+    it('uses stdin placeholder as final arg on Windows when CLI is a .cmd shim', () => {
+      const origPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      try {
+        const provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+          cliPath?: string;
+          detectedStrategy?: string;
+        };
+        provider.cliPath = 'C:\\Users\\u\\AppData\\Roaming\\npm\\cursor-agent.cmd';
+        provider.detectedStrategy = 'native';
+
+        const args = provider.buildCliArgs({
+          prompt: 'x',
+          model: 'gpt-5',
+          cwd: '/tmp/project',
+        });
+
+        expect(args[args.length - 1]).toBe('-');
+      } finally {
+        Object.defineProperty(process, 'platform', { value: origPlatform });
+      }
+    });
   });
 
   describe('normalizeEvent - result error handling', () => {

@@ -10,7 +10,7 @@
  * - Handles multiple model sources with priority
  *
  * With canonical model IDs:
- * - Cursor: cursor-auto, cursor-composer-1, cursor-gpt-5.2
+ * - Cursor: cursor-auto, cursor-composer-2, cursor-gpt-5.2
  * - OpenCode: opencode-big-pickle, opencode-kimi-k2.5-free
  * - Copilot: copilot-gpt-5.1, copilot-claude-sonnet-4.5, copilot-gemini-3-pro-preview
  * - Gemini: gemini-2.5-flash, gemini-2.5-pro
@@ -45,9 +45,9 @@ const OPENAI_O_SERIES_ALLOWED_MODELS = new Set<string>();
  *
  * Handles both canonical prefixed IDs and legacy aliases:
  * - Canonical: cursor-auto, cursor-gpt-5.2, opencode-big-pickle, claude-sonnet
- * - Legacy: auto, composer-1, sonnet, opus
+ * - Legacy: auto, composer-1 (→ cursor-composer-2), sonnet, opus
  *
- * @param modelKey - Model key (e.g., "claude-opus", "cursor-composer-1", "sonnet")
+ * @param modelKey - Model key (e.g., "claude-opus", "cursor-composer-2", "sonnet")
  * @param defaultModel - Fallback model if modelKey is undefined
  * @returns Full model string
  */
@@ -71,7 +71,7 @@ export function resolveModelString(
     console.log(`[ModelResolver] Migrated legacy ID: "${modelKey}" -> "${canonicalKey}"`);
   }
 
-  // Cursor model with explicit prefix (e.g., "cursor-auto", "cursor-composer-1")
+  // Cursor model with explicit prefix (e.g., "cursor-auto", "cursor-composer-2")
   // Pass through unchanged - provider will extract bare ID for CLI
   if (canonicalKey.startsWith(PROVIDER_PREFIXES.cursor)) {
     console.log(`[ModelResolver] Using Cursor model: ${canonicalKey}`);
