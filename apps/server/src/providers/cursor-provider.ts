@@ -14,7 +14,15 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { findCliInWsl, isWslAvailable } from '@automaker/platform';
+import {
+  findCliInWsl,
+  isWslAvailable,
+  windowsToWslPath,
+  spawnJSONLProcess,
+  execInWsl,
+  getAutomakerDir,
+  type SubprocessOptions,
+} from '@automaker/platform';
 import {
   CliProvider,
   type CliSpawnConfig,
@@ -29,7 +37,7 @@ import type {
   ModelDefinition,
   ContentBlock,
 } from './types.js';
-import { validateBareModelId } from '@automaker/types';
+import { validateBareModelId, calculateReasoningTimeout } from '@automaker/types';
 import { validateApiKey } from '../lib/auth-utils.js';
 import { getEffectivePermissions, detectProfile } from '../services/cursor-config-service.js';
 import {
@@ -42,7 +50,7 @@ import {
   CURSOR_MODEL_MAP,
 } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
-import { spawnJSONLProcess, execInWsl } from '@automaker/platform';
+import { randomBytes } from 'crypto';
 
 // Create logger for this module
 const logger = createLogger('CursorProvider');
@@ -209,9 +217,9 @@ function formatCursorToolResult(toolCall: CursorToolCallEvent['tool_call']): str
   for (const [key, handler] of Object.entries(CURSOR_TOOL_HANDLERS)) {
     const toolData = toolCall[key as keyof typeof toolCall] as
       | {
-          args?: unknown;
-          result?: { success?: unknown; rejected?: { reason: string } };
-        }
+        args?: unknown;
+        result?: { success?: unknown; rejected?: { reason: string } };
+      }
       | undefined;
 
     if (toolData?.result) {
@@ -400,8 +408,13 @@ export class CursorProvider extends CliProvider {
   }
 
   /**
+   * Max prompt length to pass as CLI arg. Longer prompts use a temp file to avoid
+   * platform command-line limits (~32KB Windows, ~2MB Linux).
+   */
+  private static readonly PROMPT_ARG_MAX_LENGTH = 24 * 1024;
+
+  /**
    * Extract prompt text from ExecuteOptions
-   * Used to pass prompt via stdin instead of CLI args to avoid shell escaping issues
    */
   private extractPromptText(options: ExecuteOptions): string {
     if (typeof options.prompt === 'string') {
@@ -416,13 +429,17 @@ export class CursorProvider extends CliProvider {
     }
   }
 
-  buildCliArgs(options: ExecuteOptions): string[] {
+  buildCliArgs(
+    options: ExecuteOptions,
+    extras?: { omitPrompt?: boolean }
+  ): string[] {
     // Model is already bare (no prefix) - validated by executeQuery
     const model = options.model || 'auto';
 
-    // Build CLI arguments for cursor-agent
-    // NOTE: Prompt is NOT included here - it's passed via stdin to avoid
-    // shell escaping issues when content contains $(), backticks, etc.
+    // Build CLI arguments for cursor-agent.
+    // NOTE: cursor-agent does NOT support reading from stdin (unlike codex). Passing "-"
+    // as the prompt causes it to literally receive "-" as the message ("your message was
+    // just a dash"). We pass the prompt as the final positional argument instead.
     const cliArgs: string[] = [];
 
     // If using Cursor IDE (cliPath is 'cursor' not 'cursor-agent'), add 'agent' subcommand
@@ -437,10 +454,11 @@ export class CursorProvider extends CliProvider {
       '--stream-partial-output' // Real-time streaming
     );
 
-    // In read-only mode, use --mode ask for Q&A style (no tools)
-    // Otherwise, add --force to allow file edits
+    // In read-only mode, use --mode ask for Q&A style (no tools).
+    // Add --trust so cursor-agent runs non-interactively without prompting (e.g., in Docker).
+    // Otherwise, add --force to allow file edits (also satisfies workspace trust).
     if (options.readOnly) {
-      cliArgs.push('--mode', 'ask');
+      cliArgs.push('--mode', 'ask', '--trust');
     } else {
       cliArgs.push('--force');
     }
@@ -455,10 +473,97 @@ export class CursorProvider extends CliProvider {
       cliArgs.push('--resume', options.sdkSessionId);
     }
 
-    // Use '-' to indicate reading prompt from stdin
-    cliArgs.push('-');
+    // Pass prompt as final positional argument (cursor-agent has no stdin support for prompts).
+    // Omit when using temp-file fallback for long prompts.
+    if (!extras?.omitPrompt) {
+      cliArgs.push(this.extractPromptText(options));
+    }
 
     return cliArgs;
+  }
+
+  /**
+   * Escape a string for use inside a bash single-quoted literal.
+   * Single quotes are escaped as '\'' (end quote, escaped quote, start quote).
+   */
+  private escapeForBashSingleQuoted(s: string): string {
+    return "'" + s.replace(/'/g, "'\\''") + "'";
+  }
+
+  /**
+   * Build subprocess options when using a temp file for the prompt.
+   * Runs cursor-agent via bash -c '... "$(cat /path)"' to avoid command-line length limits.
+   */
+  private buildSubprocessOptionsWithPromptFile(
+    options: ExecuteOptions,
+    cliArgs: string[],
+    promptFilePath: string
+  ): SubprocessOptions {
+    this.ensureCliDetected();
+    if (!this.cliPath) {
+      throw new Error(`${this.getCliName()} CLI not found. ${this.getInstallInstructions()}`);
+    }
+
+    const cwd = options.cwd || process.cwd();
+    const timeout = calculateReasoningTimeout(options.reasoningEffort, 120000);
+
+    const filteredEnv: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) {
+        filteredEnv[key] = value;
+      }
+    }
+
+    const escapedArgs = cliArgs.map((a) => this.escapeForBashSingleQuoted(a)).join(' ');
+    const escapedPath = this.escapeForBashSingleQuoted(promptFilePath);
+
+    if (this.useWsl && this.wslCliPath) {
+      const wslCwd = windowsToWslPath(cwd);
+      const wslPromptPath = windowsToWslPath(promptFilePath);
+      const wslEscapedPath = this.escapeForBashSingleQuoted(wslPromptPath);
+      const fullCommand = `${this.escapeForBashSingleQuoted(this.wslCliPath)} ${escapedArgs} "$(cat ${wslEscapedPath})"`;
+
+      const wslArgs = this.wslDistribution
+        ? ['-d', this.wslDistribution, '--cd', wslCwd, 'bash', '-c', fullCommand]
+        : ['--cd', wslCwd, 'bash', '-c', fullCommand];
+
+      return {
+        command: 'wsl.exe',
+        args: wslArgs,
+        cwd,
+        env: filteredEnv,
+        abortController: options.abortController,
+        timeout,
+      };
+    }
+
+    // Native (Linux/macOS) or npx/direct on Windows
+    const cliPath = this.cliPath;
+    const fullCommand = `${this.escapeForBashSingleQuoted(cliPath)} ${escapedArgs} "$(cat ${escapedPath})"`;
+
+    if (this.detectedStrategy === 'npx') {
+      // Run full npx invocation inside bash (fixes temp-file path: npx was incorrectly
+      // passing bash -c to cursor-agent instead of running the shell)
+      const npxArgsEscaped = this.npxArgs.map((a) => this.escapeForBashSingleQuoted(a)).join(' ');
+      const fullNpxCommand = `npx ${npxArgsEscaped} ${escapedArgs} "$(cat ${escapedPath})"`;
+      return {
+        command: 'bash',
+        args: ['-c', fullNpxCommand],
+        cwd,
+        env: filteredEnv,
+        abortController: options.abortController,
+        timeout,
+      };
+    }
+
+    return {
+      command: 'bash',
+      args: ['-c', fullCommand],
+      cwd,
+      env: filteredEnv,
+      abortController: options.abortController,
+      timeout,
+    };
   }
 
   /**
@@ -503,7 +608,7 @@ export class CursorProvider extends CliProvider {
           const toolCallKeys = Object.keys(toolCall);
           logger.warn(
             `[UNHANDLED TOOL_CALL] Unknown tool call structure. Keys: ${toolCallKeys.join(', ')}. ` +
-              `Full tool_call: ${JSON.stringify(toolCall).substring(0, 500)}`
+            `Full tool_call: ${JSON.stringify(toolCall).substring(0, 500)}`
           );
           return null;
         }
@@ -862,23 +967,45 @@ export class CursorProvider extends CliProvider {
       const serverCount = Object.keys(options.mcpServers).length;
       logger.warn(
         `MCP servers configured (${serverCount}) but not yet supported by Cursor CLI in AutoMaker. ` +
-          `MCP support for Cursor will be added in a future release. ` +
-          `The configured MCP servers will be ignored for this execution.`
+        `MCP support for Cursor will be added in a future release. ` +
+        `The configured MCP servers will be ignored for this execution.`
       );
     }
 
     // Embed system prompt into user prompt (Cursor CLI doesn't support separate system messages)
     const effectiveOptions = this.embedSystemPromptIntoPrompt(options);
 
-    // Extract prompt text to pass via stdin (avoids shell escaping issues)
+    // Extract prompt text (cursor-agent expects it as positional arg, not stdin)
     const promptText = this.extractPromptText(effectiveOptions);
 
-    const cliArgs = this.buildCliArgs(effectiveOptions);
-    const subprocessOptions = this.buildSubprocessOptions(options, cliArgs);
+    const useTempFile = promptText.length > CursorProvider.PROMPT_ARG_MAX_LENGTH;
+    let promptFilePath: string | null = null;
 
-    // Pass prompt via stdin to avoid shell interpretation of special characters
-    // like $(), backticks, etc. that may appear in file content
-    subprocessOptions.stdinData = promptText;
+    let cliArgs: string[];
+    let subprocessOptions: ReturnType<typeof this.buildSubprocessOptions>;
+
+    if (useTempFile) {
+      // Temp file fallback for long prompts (avoids platform command-line limits)
+      const cwd = options.cwd || process.cwd();
+      const automakerDir = getAutomakerDir(cwd);
+      const promptId = randomBytes(8).toString('hex');
+      promptFilePath = path.join(automakerDir, `.cursor-prompt-${promptId}`);
+      fs.mkdirSync(automakerDir, { recursive: true });
+      fs.writeFileSync(promptFilePath, promptText, 'utf8');
+      logger.debug(
+        `Prompt length ${promptText.length} exceeds limit; using temp file: ${promptFilePath}`
+      );
+
+      cliArgs = this.buildCliArgs(effectiveOptions, { omitPrompt: true });
+      subprocessOptions = this.buildSubprocessOptionsWithPromptFile(
+        options,
+        cliArgs,
+        promptFilePath
+      );
+    } else {
+      cliArgs = this.buildCliArgs(effectiveOptions);
+      subprocessOptions = this.buildSubprocessOptions(options, cliArgs);
+    }
 
     let sessionId: string | undefined;
 
@@ -927,8 +1054,8 @@ export class CursorProvider extends CliProvider {
                 .join(',') || 'unknown';
             logger.info(
               `[RAW TOOL_CALL] call_id=${toolEvent.call_id} types=[${toolTypes}]` +
-                (tc.shellToolCall ? ` cmd="${tc.shellToolCall.args?.command}"` : '') +
-                (tc.writeToolCall ? ` path="${tc.writeToolCall.args?.path}"` : '')
+              (tc.shellToolCall ? ` cmd="${tc.shellToolCall.args?.command}"` : '') +
+              (tc.writeToolCall ? ` path="${tc.writeToolCall.args?.path}"` : '')
             );
           }
         }
@@ -994,6 +1121,15 @@ export class CursorProvider extends CliProvider {
         );
       }
       throw error;
+    } finally {
+      if (promptFilePath) {
+        try {
+          await fs.promises.unlink(promptFilePath);
+          logger.debug(`Removed temp prompt file: ${promptFilePath}`);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   }
 

@@ -1,0 +1,2 @@
+# Ensure shell scripts use LF (fixes Docker entrypoint on Windows)
+*.sh text eol=lf
